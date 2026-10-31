@@ -391,6 +391,8 @@ body.touch #hotbar kbd{display:none}
 #riddle .rl{margin-top:10px;width:100%;text-align:center;opacity:.85}
 #bagView{display:none!important}
 html,body{touch-action:none;-webkit-text-size-adjust:100%;overscroll-behavior:none}
+#bA.spell{background:radial-gradient(circle at 40% 35%,#ffe0a0,#ff7a3d 60%,#c84a1a)!important;font-size:10px!important;line-height:1.1;text-align:center;padding:4px}
+#hotbar .hs.on::before{content:"";position:absolute;inset:-2px;border-radius:10px;box-shadow:inset 0 0 0 3px #ffe46b;z-index:2}
 
 </style>
 
@@ -704,7 +706,7 @@ const tAt=(m,x,y)=>(x<0||y<0||x>=m.w||y>=m.h)?CLIFF:m.t[y*m.w+x];
 const zAt=(m,x,y)=>(x<0||y<0||x>=m.w||y>=m.h)?9:m.z[y*m.w+x];
 const zUnder=(x,y)=>{const z=zAt(map,Math.floor(x/T),Math.floor(y/T));return z===9?0:z;};
 function setTile(x,y,t,record=true){
-  map.t[y*map.w+x]=t;
+  map.t[y*map.w+x]=t; if(typeof tileChanged==='function') tileChanged(x,y);
   if(record&&map.name==='world') S.mods[x+','+y]=t;
 }
 function applyMods(){ for(const k in S.mods){ const [x,y]=k.split(',').map(Number); maps.world.t[y*maps.world.w+x]=S.mods[k]; } }
@@ -1732,7 +1734,7 @@ function updatePlayer(dt){
   if(rideSp) updateRide(dt);
   if(pressed.has('attack')){ const tt=talkTarget(); if(tt&&P.air<=0){ if(tt.npc){ if(tt.npc.shop) openShop(tt.npc.shop); else say(tt.npc.talk()); } else if(tt.sign) say([['erz',tt.sign]]); return; } attack(); }
   else if(held.attack&&P.cool<=0) attack();
-  if(pressed.has('staff')&&talkTarget()&&P.air<=0){ const tt=talkTarget(); if(tt.npc){ if(tt.npc.shop) openShop(tt.npc.shop); else say(tt.npc.talk()); } else if(tt.sign) say([['erz',tt.sign]]); held.staff=0; } else if((pressed.has('staff')||held.staff)&&P.cool<=0) staffAttack();
+  if(pressed.has('staff')&&talkTarget()&&P.air<=0){ const tt=talkTarget(); if(tt.npc){ if(tt.npc.shop) openShop(tt.npc.shop); else say(tt.npc.talk()); } else if(tt.sign) say([['erz',tt.sign]]); held.staff=0; } else if((pressed.has('staff')||held.staff)&&P.cool<=0) mainAttack();
   if(pressed.has('roll')&&typeof tryRoll==='function') tryRoll();
 
   if(P.air<=0){
@@ -3348,7 +3350,7 @@ function updateMini(){
 let _bAtxt='';
 function controlsTick(dt){
   if(!S){ updateMini(); return; } ensureS(); if(typeof ensureMag==='function'&&!(S.mag&&S.inv)) ensureMag(); if(typeof magicTick==='function'){ magicTick(dt); fx3Tick(dt); } if(typeof lootTick==='function'){ if(!S.inv) { ensureInv(); calcStats(); } lootTick(dt); loot3Tick(); } if(typeof townTick==='function') townTick(dt); if(typeof dngTick==='function'){ dngTick(dt); hallTick(dt); } if(typeof cityTick==='function') cityTick(dt); if(typeof finaleTick==='function') finaleTick(dt); if(typeof world2Tick==='function') world2Tick(dt); if(mode==='play'){ for(const k in QCD) if(QCD[k]>0) QCD[k]=Math.max(0,QCD[k]-dt); }
-  const t='Skill\n'+nextSkillName(); if(t!==_bAtxt){ _bAtxt=t; const e=document.getElementById('bS'); const ea=document.getElementById('bA'); if(ea&&ea.textContent!=='Angriff') ea.textContent='Angriff'; if(e){ e.style.whiteSpace='pre-line'; e.style.textAlign='center'; e.textContent=t; } }
+  const t='Stab'; if(t!==_bAtxt){ _bAtxt=t; const e=document.getElementById('bS'); const ea=document.getElementById('bA'); if(ea&&ea.textContent!=='Angriff') ea.textContent='Angriff'; if(e){ e.style.whiteSpace='pre-line'; e.style.textAlign='center'; e.textContent=t; } }
   updateMini(); if(typeof tipsTick==='function') tipsTick(dt); if(typeof moreTick==='function') moreTick(dt);
 }
 /* ---- Speicherplaetze ---- */
@@ -3455,7 +3457,7 @@ function mkMesh(a,mat,cast,fadeList){
 }
 function matOfT(m,x,y){ const gt=groundOf(m,m.t[y*m.w+x],x,y); if(gt===PEBBLE||gt===MUSH||gt===FLOWER||gt===TALL){ const ar=m.name==='world'&&typeof areaAt==='function'?areaAt(x,y):null; if(ar) return matOf(ar.floor,m); return matOf(regionAt(m,x,y),m); } return matOf(gt,m); }
 function matOf(gt,m){ if(gt>=41&&gt<=47) return {41:19,42:20,43:21,44:22,45:23,46:24,47:25}[gt]; if(gt===G||gt===SWAMPG||gt===FLOWER||gt===MUSH||gt===TALL) return 1; if(gt===PEBBLE) return 7; if(gt===PATH) return 2; if(gt===STAIRS) return 6; if(gt===BRIDGE||gt===WATER) return 7;
-  if(gt===FLOOR||gt===TFLOOR||gt===ARF||gt===ARW||gt===ARE||gt===ARS) return 6; if(gt===SAND) return 4; if(gt===MOUNT) return 18; if(gt===COOLED||gt===LAVA) return 3; if(gt===SNOW) return 5; return 0; }
+  if(gt===FLOOR||gt===TFLOOR||gt===ARF||gt===ARW||gt===ARE||gt===ARS) return 6; if(gt===SAND) return 4; if(gt===MOUNT) return 18; if(gt===COOLED||gt===LAVA) return 3; if(gt===SNOW||gt===ICE) return 5; return 0; }
 const REFC={1:'#4f9a45',2:'#c7a36a',4:'#b97c49',5:'#dfe8ef',3:'#857b6c',6:'#a8a2b8',18:'#857b6c'};
 function cornerCol(m,x,y,dx,dy){
   const base=m.z[y*m.w+x], mid=matOfT(m,x,y); let r=0,g=0,b=0,w=0;
@@ -4980,7 +4982,7 @@ function scr(x,y,h){ if(!gl3||!G3.camera) return null; const r=gl3.domElement.ge
 /* ---------- Sprechen ---------- */
 let TALKEL=null;
 function talkTick(){ const ea=document.getElementById('bA'); const tt=(S&&mode==='play'&&typeof talkTarget==='function')?talkTarget():null;
-  if(ea){ const want=tt?'Sprechen':'Angriff'; if(ea.textContent!==want){ ea.textContent=want; ea.classList.toggle('talk',!!tt); } }
+  if(ea){ let want='Angriff'; if(tt) want='Sprechen'; else if(S&&S.mag){ const id=selSpell(); if(id&&!((QCD[id]||0)>0)) want=skInfo(id).n; } if(ea.textContent!==want){ ea.textContent=want; ea.classList.toggle('talk',!!tt); ea.classList.toggle('spell',!tt&&want!=='Angriff'); } }
   if(!TALKEL){ TALKEL=document.createElement('div'); TALKEL.id='talkhint'; document.getElementById('ui').appendChild(TALKEL); }
   if(!tt){ TALKEL.hidden=true; return; } const x=tt.npc?tt.npc.px:(tt.x!=null?tt.x*T+8:P.x), y=tt.npc?tt.npc.py:(tt.y!=null?tt.y*T+8:P.y-16); const z=(zAt(map,Math.floor(x/T),Math.floor(y/T))||0)*HZ; const p=scr(x,y,z+2.4); if(!p){ TALKEL.hidden=true; return; }
   TALKEL.hidden=false; TALKEL.style.left=p[0]+'px'; TALKEL.style.top=p[1]+'px'; TALKEL.innerHTML='💬 <b>'+(tt.npc?((WHO[tt.npc.id]&&WHO[tt.npc.id].n)||'Sprechen'):'Lesen')+'</b><small>'+(touchMode?'Tippe „Sprechen“':'Taste F oder Enter')+'</small>'; }
@@ -5219,17 +5221,18 @@ function lshopPlace(){ if(LSHOPOK||!maps||!maps.world) return; LSHOPOK=true; con
   document.addEventListener('dblclick',e=>e.preventDefault(),{passive:false});
   document.addEventListener('wheel',e=>{ if(e.ctrlKey) e.preventDefault(); },{passive:false});
 })();
-/* ===== Zauber strikt der Reihe nach 1 → 2 → 3 → 4; nicht bereit (Abklingzeit oder zu wenig Mana) = automatisch der naechste ===== */
-function attack(){
-  ensureMag(); if(P.cool>0) return; if(typeof finCannon==='function'&&finCannon()) return; quickFill();
-  let lowMp=false;
-  for(let k=0;k<4;k++){ const i=(S.qi+k)%4, id=S.quick[i]; if(!id) continue; if((QCD[id]||0)>0) continue; const sk=skInfo(id); if(S.mp<sk.mp){ lowMp=true; continue; }
-    S.mp-=sk.mp; QCD[id]=sk.cd; S.qi=(i+1)%4; castSkill(sk); if(S.cnt) S.cnt.casts++; return; }
-  if(lowMp) floatTxt(P.x,SY(P.y,P.zv)-24,'Zu wenig Mana','#9fc8ff');
-  staffAttack();
-}
-function castSlot(i){ if(!S||mode!=='play') return; quickFill(); S.qi=i; attack(); }
-function nextSkillName(){ if(!S||!S.mag) return 'Stab'; quickFill(); for(let k=0;k<4;k++){ const i=(S.qi+k)%4, id=S.quick[i]; if(!id||(QCD[id]||0)>0) continue; const sk=skInfo(id); if(S.mp>=sk.mp) return sk.n; } return 'Stab'; }
+/* ===== Zauber: unten in der Leiste auswaehlen (antippen = auswaehlen + wirken), grosser Knopf rechts wirkt den ausgewaehlten Zauber ===== */
+let MANAMSG=0;
+function selSpell(){ if(!S||!S.quick) return null; quickFill(); if(S.qi==null||!S.quick[S.qi]){ const f=S.quick.findIndex(q=>q); S.qi=f<0?0:f; } return S.quick[S.qi]||null; }
+function mainAttack(){ if(!S||P.cool>0||mode!=='play') return; ensureMag(); if(typeof finCannon==='function'&&finCannon()) return;
+  const id=selSpell(); if(id&&!((QCD[id]||0)>0)){ const sk=skInfo(id); if(S.mp>=sk.mp){ S.mp-=sk.mp; QCD[id]=sk.cd; castSkill(sk); if(S.cnt) S.cnt.casts++; return; }
+    if(time-MANAMSG>1.5){ MANAMSG=time; floatTxt(P.x,SY(P.y,P.zv)-24,'Zu wenig Mana','#9fc8ff'); } }
+  staffAttack(); }
+function attack(){ staffAttack(); }
+function castSlot(i){ if(!S||mode!=='play') return; quickFill(); if(!S.quick[i]) return; S.qi=i; SFX.blip&&SFX.blip(); mainAttack(); }
+function nextSkillName(){ const id=selSpell(); return id?skInfo(id).n:'Stab'; }
+/* Wasser, Eis usw.: Kachel geaendert -> betroffene 3D-Bereiche neu bauen */
+function tileChanged(x,y){ if(typeof G3==='undefined'||!G3.chunks) return; const ks=new Set(); for(const [dx,dy] of [[0,0],[1,0],[-1,0],[0,1],[0,-1]]){ ks.add(chunkKey(Math.floor((x+dx)/CH),Math.floor((y+dy)/CH))); } for(const k of ks){ const ch=G3.chunks.get(k); if(ch){ disposeChunk(ch); G3.chunks.delete(k); } } }
 
 function boot(data){
   resize(); toTitle();
