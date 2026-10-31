@@ -1,4 +1,4 @@
-<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
 <link rel="manifest" href="manifest.webmanifest"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="Elmaria"><link rel="apple-touch-icon" href="icon.png"><meta name="theme-color" content="#2a1e15"><title>Elmaria Variante 2</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -390,6 +390,7 @@ body.touch #hotbar kbd{display:none}
 .abar{height:6px;border-radius:3px;background:#1a110a;margin:6px 0 3px;overflow:hidden} .abar i{display:block;height:100%;background:linear-gradient(90deg,#e0a83a,#ffd877)}
 #riddle .rl{margin-top:10px;width:100%;text-align:center;opacity:.85}
 #bagView{display:none!important}
+html,body{touch-action:none;-webkit-text-size-adjust:100%;overscroll-behavior:none}
 
 </style>
 
@@ -5208,6 +5209,16 @@ function lshopPlace(){ if(LSHOPOK||!maps||!maps.world) return; LSHOPOK=true; con
   for(const d of NPC_DEFS){ if(!d.cand) continue; used.delete(d.x+','+d.y); const ok=d.cand.find(([x,y])=>{ const t=tAt(maps.world,x,y); return !SOLID[t]&&!HAZ[t]&&!used.has(x+','+y); })||d.cand[0]; d.x=ok[0]; d.y=ok[1]; used.add(d.x+','+d.y);
     const n=npcs.find(q=>q.id===d.id); if(n){ n.x=d.x; n.y=d.y; n.px=d.x*T+8; n.py=d.y*T+8; } } }
 (function(){ const m0=moreTick; moreTick=function(dt){ lshopPlace(); m0(dt); }; })();
+
+/* ==== 26_nozoom.js ==== */
+/* ===== Kein versehentliches Zoomen auf Tablet/Handy (iPad, Safari, Chrome) ===== */
+(function(){ const stop=e=>{ e.preventDefault(); };
+  document.addEventListener('gesturestart',stop,{passive:false}); document.addEventListener('gesturechange',stop,{passive:false}); document.addEventListener('gestureend',stop,{passive:false});
+  document.addEventListener('touchmove',e=>{ if(e.touches&&e.touches.length>1) e.preventDefault(); if(e.scale!==undefined&&e.scale!==1) e.preventDefault(); },{passive:false});
+  let last=0; document.addEventListener('touchend',e=>{ const now=Date.now(); const t=e.target; const inMenu=t&&t.closest&&t.closest('input,textarea,select'); if(!inMenu&&now-last<350) e.preventDefault(); last=now; },{passive:false});
+  document.addEventListener('dblclick',e=>e.preventDefault(),{passive:false});
+  document.addEventListener('wheel',e=>{ if(e.ctrlKey) e.preventDefault(); },{passive:false});
+})();
 
 function boot(data){
   resize(); toTitle();
