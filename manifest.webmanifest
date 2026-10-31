@@ -1,0 +1,1 @@
+{"name": "Elmaria", "short_name": "Elmaria", "start_url": "./", "display": "fullscreen", "orientation": "landscape", "background_color": "#170f0a", "theme_color": "#2a1e15", "icons": [{"src": "icon.png", "sizes": "512x512", "type": "image/png"}]}
