@@ -5219,6 +5219,17 @@ function lshopPlace(){ if(LSHOPOK||!maps||!maps.world) return; LSHOPOK=true; con
   document.addEventListener('dblclick',e=>e.preventDefault(),{passive:false});
   document.addEventListener('wheel',e=>{ if(e.ctrlKey) e.preventDefault(); },{passive:false});
 })();
+/* ===== Zauber strikt der Reihe nach 1 → 2 → 3 → 4; nicht bereit (Abklingzeit oder zu wenig Mana) = automatisch der naechste ===== */
+function attack(){
+  ensureMag(); if(P.cool>0) return; if(typeof finCannon==='function'&&finCannon()) return; quickFill();
+  let lowMp=false;
+  for(let k=0;k<4;k++){ const i=(S.qi+k)%4, id=S.quick[i]; if(!id) continue; if((QCD[id]||0)>0) continue; const sk=skInfo(id); if(S.mp<sk.mp){ lowMp=true; continue; }
+    S.mp-=sk.mp; QCD[id]=sk.cd; S.qi=(i+1)%4; castSkill(sk); if(S.cnt) S.cnt.casts++; return; }
+  if(lowMp) floatTxt(P.x,SY(P.y,P.zv)-24,'Zu wenig Mana','#9fc8ff');
+  staffAttack();
+}
+function castSlot(i){ if(!S||mode!=='play') return; quickFill(); S.qi=i; attack(); }
+function nextSkillName(){ if(!S||!S.mag) return 'Stab'; quickFill(); for(let k=0;k<4;k++){ const i=(S.qi+k)%4, id=S.quick[i]; if(!id||(QCD[id]||0)>0) continue; const sk=skInfo(id); if(S.mp>=sk.mp) return sk.n; } return 'Stab'; }
 
 function boot(data){
   resize(); toTitle();
