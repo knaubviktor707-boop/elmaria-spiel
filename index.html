@@ -1742,6 +1742,8 @@ function updatePlayer(dt){
     if(tAt(map,tx,Math.floor(P.y/T))===TDOOR||tAt(map,tx,Math.floor((P.y-4)/T))===TDOOR){
       if(map.name==='world'){
         if(S.won) { say([['erz','Im Turm ist es jetzt still und hell. Orin wohnt wieder im Dorf.']]); P.y+=6; }
+        else if(typeof towerLocked==='function'&&towerLocked()){ say([['erz','Das Tor des Nebelturms ist versiegelt. Erst wenn alle Gebietsbosse besiegt sind, öffnet es sich.']]); P.y+=8; }
+        else if(typeof startFinale==='function'){ startFinale(); }
         else { save(); enterMap('tower',11*T+8,14*T+8,0); P.dir=1; }
       } else if(map.name==='tower'&&S.won){ enterMap('world',TCX*T+8,41*T+8,1); P.dir=0; save(); }
       else if(map.name==='tower'){ floatTxt(P.x,P.y-20,'Verschlossen!','#c08cff'); P.y-=6; }
@@ -1862,7 +1864,7 @@ function projEnemy(p){
   if(p.el==='tornado'){ const dx=P.x-p.x, dy=P.y-p.y, d=Math.hypot(dx,dy)||1; p.vx+=(dx/d*46-p.vx)*0.02; p.vy+=(dy/d*46-p.vy)*0.02; if(p.t>6) p.d=0; if(Math.random()<0.05) parts.push({x:p.x+(Math.random()-.5)*10,y:SY(p.y,p.z||0)-4,vx:0,vy:-20,life:0.5,max:0.5,c:'#dfffee',s:1}); }
   const tx=Math.floor(p.x/T), ty=Math.floor(p.y/T);
   if(SOLID[tAt(map,tx,ty)]||p.d<=0){ p.dead=true; addParts(p.x,SY(p.y,p.z||0)-6,'#c8b8e8',4,20,0.3); return; }
-  if(P.air<=0&&P.fall<=0&&Math.hypot(P.x-p.x,P.y-6-p.y)<8){ hurtPlayer(1,p.x,p.y); p.dead=true; return; }
+  if(P.air<=0&&P.fall<=0&&Math.hypot(P.x-p.x,P.y-6-p.y)<8){ hurtPlayer(p.dmg||1,p.x,p.y); p.dead=true; return; }
   for(const f of followers()){ if(Math.hypot(f.x-p.x,f.y-6-p.y)<8){ hurtFollower(f,1); p.dead=true; return; } }
 }
 function burnSpread(tx,ty,t){
@@ -2366,6 +2368,7 @@ function updateToast(dt){ if(toastT>0){ toastT-=dt; if(toastT<=0){ $('#toast').h
 function updateGoal(){
   const g=$('#goal'); if(!S){g.hidden=true;return;}
   if(map&&map.name==='dng'&&typeof dngGoal==='function'){ g.innerHTML=dngGoal(); g.hidden=(mode==='title'); return; }
+  if(typeof storyGoal==='function'){ const sg=storyGoal(); if(sg){ g.innerHTML=sg; g.hidden=(mode==='title'); return; } }
   const n=Object.keys(S.powers).length; let t;
   if(GU) t='<b>Wächter:</b> Besiege '+GDEF[GU.kind].art+' '+GU.name+'!';
   else if(S.won) t='<b>Elmaria ist frei!</b> Herzkristalle '+Object.keys(S.crystals).length+'/'+CRYSTALS.length+' · Erkunde Mondsumpf und Frostland';
@@ -4059,7 +4062,7 @@ function renderBag(b){
   ensureInv(); calcStats(); const wrap=document.createElement('div'); wrap.id='bag'; b.appendChild(wrap);
   const left=document.createElement('div'); wrap.appendChild(left); const cvv=document.createElement('canvas'); cvv.id='bagView'; left.appendChild(cvv);
   const eg=document.createElement('div'); eg.className='eqgrid'; left.appendChild(eg);
-  for(const s of SLOTS){ const it=S.eq[s]; const d=document.createElement('button'); d.type='button'; d.className='isl'+(it?' q'+it.q:' empty')+(BSEL&&BSEL.eq===s?' sel':''); d.innerHTML=it?itemIcon(it)+(it.slot==='potion'?'<small>'+it.n+'</small>':'<small>'+(it.ilvl||1)+'</small>'):SLOTN[s]; d.title=it?it.name:SLOTN[s]; d.onclick=()=>{ BSEL=it?{eq:s,it}:null; renderMenu(); }; eg.appendChild(d); }
+  for(const s of SLOTS){ const it=S.eq[s]; const d=document.createElement('button'); d.type='button'; d.className='isl'+(it?' q'+it.q:' empty')+(BSEL&&BSEL.eq===s?' sel':''); d.innerHTML=it?itemIcon(it)+(it.slot==='potion'?'<small>'+it.n+'</small>':'<small>'+(it.ilvl||1)+'</small>'):SLOTN[s]; d.title=it?it.name:SLOTN[s]; d.onclick=()=>{ if(it){ if(S.inv.length>=S.invSize){ showToast('Beutel voll!',1.4); return; } unequip(s); BSEL=null; showToast(it.name+' in den Beutel gelegt',1.4); renderMenu(); } }; eg.appendChild(d); }
   const st=document.createElement('div'); st.className='statl'; st.innerHTML='Leben <b>'+S.maxHp+'</b> · Mana <b>'+S.maxMp+'</b> · Rüstung <b>'+Math.round(STATS.armor)+'</b> · Schaden <b>+'+Math.round((powMul()-1)*100)+'%</b> · Ausweichen <b>'+Math.round(STATS.dodge)+'%</b> · Laufen <b>'+Math.round((spdMul()-1)*100)+'%</b><br>Gold <b>'+(S.gold||0)+'</b> · Kristalle <b>'+(S.gems||0)+'</b>'; left.appendChild(st);
   const right=document.createElement('div'); wrap.appendChild(right);
   const top=document.createElement('div'); top.className='row'; top.innerHTML='<label>Beutel '+S.inv.length+'/'+S.invSize+'</label>';
@@ -4067,7 +4070,7 @@ function renderBag(b){
   const junk=document.createElement('button'); junk.type='button'; junk.className='mb'; const jv=S.inv.filter(i=>i.q===0&&!i.lock&&i.slot!=='potion'); junk.textContent='Plunder verkaufen ('+jv.reduce((a,i)=>a+sellVal(i),0)+' Gold)'; junk.disabled=!inTown()||!jv.length; junk.title='Nur in einer Stadt'; junk.onclick=()=>{ for(const i of jv){ S.gold+=sellVal(i); } S.inv=S.inv.filter(i=>!jv.includes(i)); SFX.shard(); save(); renderMenu(); }; top.appendChild(junk);
   if(S.invSize<120){ const ex=document.createElement('button'); ex.type='button'; ex.className='mb'; const c=200*(1+(S.invSize-30)/10); ex.textContent='+10 Plätze ('+c+' Gold)'; ex.disabled=(S.gold||0)<c; ex.onclick=()=>{ S.gold-=c; S.invSize+=10; save(); renderMenu(); }; top.appendChild(ex); }
   right.appendChild(top);
-  const ig=document.createElement('div'); ig.className='invgrid'; for(let i=0;i<S.invSize;i++){ const it=S.inv[i]; const d=document.createElement('button'); d.type='button'; d.className='isl'+(it?' q'+it.q:' empty')+(BSEL&&BSEL.it===it&&!BSEL.eq?' sel':''); if(it){ d.innerHTML=itemIcon(it)+'<small>'+(it.slot==='potion'?it.n:(it.ilvl||1))+'</small>'+(it.lock?'<span class="lk">🔒</span>':''); d.title=it.name; d.onclick=()=>{ BSEL={it}; renderMenu(); }; } else d.innerHTML=''; ig.appendChild(d); } right.appendChild(ig);
+  const ig=document.createElement('div'); ig.className='invgrid'; for(let i=0;i<S.invSize;i++){ const it=S.inv[i]; const d=document.createElement('button'); d.type='button'; d.className='isl'+(it?' q'+it.q:' empty')+(BSEL&&BSEL.it===it&&!BSEL.eq?' sel':''); if(it){ d.innerHTML=itemIcon(it)+'<small>'+(it.slot==='potion'?it.n:(it.ilvl||1))+'</small>'+(it.lock?'<span class="lk">🔒</span>':''); d.title=it.name; d.onclick=()=>{ bagTapEquip(it); }; } else d.innerHTML=''; ig.appendChild(d); } right.appendChild(ig);
   if(BSEL&&BSEL.it){ const it=BSEL.it; const det=document.createElement('div'); det.className='idet'; const cmp=!BSEL.eq&&it.slot!=='potion'?S.eq[slotFor(it)]:null;
     det.innerHTML='<b class="iname'+it.q+'">'+itemIcon(it)+' '+it.name+'</b> <small>('+QN[it.q]+')</small><br>'+statLines(it).join('<br>')+(cmp?'<br><br><small>Angelegt: <span class="iname'+cmp.q+'">'+cmp.name+'</span></small><br><small>'+statLines(cmp).join(' · ')+'</small>':'');
     const acts=document.createElement('div'); acts.className='acts';
@@ -4093,6 +4096,8 @@ function bagPreview(cvv){
 { const t=MENU.tabs.find(q=>q.id==='bag'); if(t) t.render=renderBag; }
 function drawGold(){ if(!S||mode==='title') return; const x=8,y=touchMode?((S.team&&S.team.length)?112:84):VH-16; ctx.font='8px Silkscreen, monospace'; ctx.textAlign='left'; const t='● '+(S.gold||0)+'   ◆ '+(S.gems||0); const w=ctx.measureText(t).width+10; ctx.fillStyle='rgba(12,8,20,.7)'; ctx.fillRect(x-3,y-9,w,13); ctx.fillStyle='#ffd84a'; ctx.fillText('● '+(S.gold||0),x+2,y); ctx.fillStyle='#8fe8ff'; ctx.fillText('◆ '+(S.gems||0),x+2+ctx.measureText('● '+(S.gold||0)+'   ').width,y); }
 window.__it={give:()=>{ ensureInv(); for(let i=0;i<10;i++) S.inv.push(genItem(5,0.8)); S.inv.push(genItem(5,0,{slot:'chest',q:4})); S.inv.push(genItem(5,0,{slot:'helm',q:3})); S.gold=500; S.gems=300; },drop:()=>{ for(let i=0;i<5;i++) dropLoot(P.x+30,P.y,P.z,{it:genItem(3,0.5,{q:i})}); dropLoot(P.x-30,P.y,P.z,{gold:40}); },equipAll:()=>{ for(const it of S.inv.slice()) if(it.q>=3) equip(it); }};
+
+function bagTapEquip(it){ const sl=slotFor(it); const old=S.eq[sl]; equip(it); BSEL={eq:sl,it}; showToast('Angelegt: '+it.name+(old&&old!==it?' – '+old.name+' ist jetzt im Beutel':''),2); renderMenu(); }
 
 /* ==== 11_town.js ==== */
 /* ===== Paket 2c: Stadt-Läden, Gasthaus, Aufgaben, Erfolge, Kreaturenbuch, Gefährten-Entwicklung ===== */
@@ -5233,6 +5238,136 @@ function castSlot(i){ if(!S||mode!=='play') return; quickFill(); if(!S.quick[i])
 function nextSkillName(){ const id=selSpell(); return id?skInfo(id).n:'Stab'; }
 /* Wasser, Eis usw.: Kachel geaendert -> betroffene 3D-Bereiche neu bauen */
 function tileChanged(x,y){ if(typeof G3==='undefined'||!G3.chunks) return; const ks=new Set(); for(const [dx,dy] of [[0,0],[1,0],[-1,0],[0,1],[0,-1]]){ ks.add(chunkKey(Math.floor((x+dx)/CH),Math.floor((y+dy)/CH))); } for(const k of ks){ const ch=G3.chunks.get(k); if(ch){ disposeChunk(ch); G3.chunks.delete(k); } } }
+
+/* ==== 27_story.js ==== */
+/* ===== Paket 23: Hauptgeschichte – von Boss zu Boss, mit Zwischenschritten (Monster, Leute, Stadtbau, Level),
+   Nebelturm erst nach allen Bossen; Bosse herausfordernder (mehr Leben, staerkere Geschosse, rufen kleine Helfer) ===== */
+const WPOS=(id)=>{ const w=WARPS.find(q=>q.id===id); return w?{x:w.x*T+8,y:(w.y+1)*T+8}:null; };
+const AB=(id)=>{ const a=(typeof allAreaBosses==='function'?allAreaBosses():[]).find(q=>q.id===id); return a&&a.arena?{x:a.arena[0]*T+8,y:a.arena[1]*T+8}:null; };
+const LINDENAU={x:62*T+8,y:79*T+8};
+const MAIN=[
+ {ch:1,t:'Sprich mit Ältester Borin in Lindenau',type:'talk',id:'borin',at:()=>null,done:'Borin: „Der Nebel wird stärker. Zuerst musst du kämpfen lernen.“'},
+ {ch:1,t:'Besiege 5 Monster rund um Lindenau',type:'kills',n:5},
+ {ch:1,t:'Lass Schmied Hagen einen Gegenstand verbessern',type:'cnt',k:'upItem',n:1,npc:'hagen'},
+ {ch:1,t:'Erreiche Level 3',type:'level',n:3},
+ {ch:1,t:'Besiege die Magmakrabbe am Feuerschrein (Osten)',type:'power',el:'feuer',at:()=>WPOS('feuer')},
+ {ch:2,t:'Baue in Lindenau die Meisterschmiede (Menü → Stadtausbau)',type:'build',id:'schmiede',n:1,at:()=>LINDENAU},
+ {ch:2,t:'Besiege die Dornenwurzel am Wasserschrein (Nordwesten)',type:'power',el:'wasser',at:()=>WPOS('wasser')},
+ {ch:2,t:'Dein Gefährte soll Level 3 erreichen',type:'pet',n:3},
+ {ch:2,t:'Besiege 10 Monster im Mondsumpf',type:'akills',area:'sumpf',n:10,at:()=>WPOS('sumpf')},
+ {ch:2,t:'Gebietsboss: Besiege die Moorkönigin im Mondsumpf',type:'aboss',id:'sumpf',L:6,at:()=>AB('sumpf')},
+ {ch:3,t:'Erreiche Level 7',type:'level',n:7},
+ {ch:3,t:'Gebietsboss: Besiege den Schattenhirsch im Dunkelwald (Süden)',type:'aboss',id:'dunkel',L:8,at:()=>AB('dunkel')},
+ {ch:3,t:'Erzähle Borin vom Dunkelwald',type:'talk',id:'borin',done:'Borin: „Du wirst stark, Lio! Im Norden wartet der Glutgolem.“'},
+ {ch:3,t:'Besiege den Glutgolem am Erdschrein (Nordosten)',type:'power',el:'erde',at:()=>WPOS('erde')},
+ {ch:3,t:'Baue die Bergführerhütte – Rana hilft dir in den Bergen',type:'build',id:'huette',n:1,at:()=>LINDENAU},
+ {ch:4,t:'Besiege 15 Monster im Frostland',type:'akills',area:'frost',n:15,at:()=>WPOS('frost')},
+ {ch:4,t:'Gebietsboss: Besiege den Frostkoloss im Frostland',type:'aboss',id:'frost',L:10,at:()=>AB('frost')},
+ {ch:4,t:'Besiege den Sturmgreif am Windschrein (Westen)',type:'power',el:'wind',at:()=>WPOS('wind')},
+ {ch:4,t:'Erreiche Level 12 und schließe einen Biom-Dungeon ab',type:'multi',parts:[{type:'level',n:12},{type:'cnt',k:'dungeons',n:1}]},
+ {ch:5,t:'Gebietsboss: Besiege die Rankenmutter im Grünen Dickicht',type:'aboss',id:'dickicht',L:14,at:()=>AB('dickicht')},
+ {ch:5,t:'Reise nach Sandhafen und sprich mit Samira (Karte öffnen)',type:'talk',id:'q_sandhafen'},
+ {ch:5,t:'Baue in Lindenau die Werft für ein Segelschiff',type:'build',id:'werft',n:1,at:()=>LINDENAU},
+ {ch:5,t:'Dein Gefährte soll Level 10 erreichen',type:'pet',n:10},
+ {ch:5,t:'Gebietsboss: Besiege den Gezeitenwurm an der Sturmküste',type:'aboss',id:'kueste',L:18,at:()=>AB('kueste')},
+ {ch:6,t:'Erreiche Level 18',type:'level',n:18},
+ {ch:6,t:'Gebietsboss: Besiege den Lavafürst im Aschekrater',type:'aboss',id:'asche',L:22,at:()=>AB('asche')},
+ {ch:6,t:'Baue das Grubenhaus – Kalle öffnet die Tiefen Stollen',type:'build',id:'grube',n:1,at:()=>LINDENAU},
+ {ch:6,t:'Gebietsboss: Besiege den Kristallwurm in den Tiefen Stollen',type:'aboss',id:'stollen',L:26,at:()=>AB('stollen')},
+ {ch:7,t:'Schließe 3 Biom-Dungeons ab',type:'cnt',k:'dungeons',n:3},
+ {ch:7,t:'Besiege 25 Monster in den Verbrannten Landen',type:'akills',area:'oed',n:25,at:()=>AB('oed')},
+ {ch:7,t:'Gebietsboss: Besiege den Aschenkönig in den Verbrannten Landen',type:'aboss',id:'oed',L:30,at:()=>AB('oed')},
+ {ch:8,t:'Baue die Luftschiffwerft – mit dem Luftschiff zu den Wolkeninseln',type:'build',id:'luft',n:1,at:()=>LINDENAU},
+ {ch:8,t:'Erreiche Level 28 – dein Gefährte Level 25',type:'multi',parts:[{type:'level',n:28},{type:'pet',n:25}]},
+ {ch:8,t:'Gebietsboss: Besiege den Himmelsdrachen auf den Wolkeninseln',type:'aboss',id:'wolken',L:34,at:()=>AB('wolken')},
+ {ch:9,t:'Erreiche Level 34',type:'level',n:34},
+ {ch:9,t:'Gebietsboss: Besiege den Sternenwächter im Sternenhain',type:'aboss',id:'sterne',L:40,at:()=>AB('sterne')},
+ {ch:9,t:'Kehre zu Borin zurück',type:'talk',id:'borin',done:'Borin: „Alle Bosse sind besiegt. Der Nebelturm öffnet sich – geh, Lio!“'},
+ {ch:10,t:'Finale: Betritt den Nebelturm und befreie Orin',type:'won',at:()=>WPOS('turm')},
+];
+const CHN=['','Kapitel 1 · Erwachen','Kapitel 2 · Wasser und Moor','Kapitel 3 · Der dunkle Wald','Kapitel 4 · Eis und Sturm','Kapitel 5 · Zur Küste','Kapitel 6 · Feuer und Tiefe','Kapitel 7 · Verbrannte Lande','Kapitel 8 · Über den Wolken','Kapitel 9 · Die Sterne','Finale'];
+function mEnsure(){ if(!S.main) S.main={i:0,base:null,ak:{}}; if(S.main.base==null) mStart(); return S.main; }
+function mStart(){ const m=S.main; m.base={kills:S.cnt?S.cnt.kills||0:0,cnt:{...(S.cnt||{})},talk:0}; m.ak={}; }
+function petMaxLvl(){ let m=0; for(const k in (S.pets||{})) m=Math.max(m,S.pets[k].lvl||0); return m; }
+function partDone(p,m){ switch(p.type){
+  case 'talk': return !!m.talked;
+  case 'kills': return (S.cnt.kills||0)-m.base.kills>=p.n;
+  case 'akills': return (m.ak[p.area]||0)>=p.n;
+  case 'cnt': return (S.cnt[p.k]||0)-(m.base.cnt[p.k]||0)>=p.n || (p.k==='upItem'&&(S.cnt.upItem||0)>=p.n&&m.i<5);
+  case 'level': ensureHL(); return (S.hl||1)>=p.n;
+  case 'pet': return petMaxLvl()>=p.n;
+  case 'power': return !!(S.powers&&S.powers[p.el]);
+  case 'build': return ((S.city&&S.city[p.id])||0)>=p.n;
+  case 'aboss': return !!(S.abd&&S.abd[p.id]);
+  case 'won': return !!S.won;
+  case 'multi': return p.parts.every(q=>partDone(q,m)); } return false; }
+function progTxt(p,m){ switch(p.type){ case 'kills': return ' ('+Math.min(p.n,(S.cnt.kills||0)-m.base.kills)+'/'+p.n+')'; case 'akills': return ' ('+Math.min(p.n,m.ak[p.area]||0)+'/'+p.n+')'; case 'level': return ' (jetzt Lv '+(S.hl||1)+')'; case 'pet': return ' (jetzt Lv '+petMaxLvl()+')'; case 'cnt': return ' ('+Math.min(p.n,(S.cnt[p.k]||0)-(m.base.cnt[p.k]||0))+'/'+p.n+')'; case 'aboss': return (S.hl||1)<p.L-2?' · empfohlen Lv '+p.L:''; case 'multi': return ' ('+p.parts.map(q=>progTxt(q,m).replace(/[()]/g,'').trim()).filter(Boolean).join(', ')+')'; } return ''; }
+function storyGoal(){ if(!S||GU||(map&&(map.name==='tower'||map.name==='fin'))) return null; if(S.won) return null; const m=mEnsure(); const st=MAIN[m.i]; if(!st) return null; return '<b>'+CHN[st.ch].split(' · ')[0]+':</b> '+st.t+progTxt(st,m); }
+function mainTarget(){ if(!S||!S.main||map.name!=='world'||S.won) return null; const st=MAIN[S.main.i]; if(!st) return null;
+  if(st.type==='talk'){ const n=npcs.find(q=>q.id===st.id); return n?{x:n.px,y:n.py,n:(WHO[st.id]&&WHO[st.id].n)||'Gespräch',sym:'★'}:null; }
+  if(st.npc){ const n=npcs.find(q=>q.id===st.npc); if(n) return {x:n.px,y:n.py,n:(WHO[st.npc]&&WHO[st.npc].n)||st.npc,sym:'★'}; }
+  const p=st.at&&st.at(); return p?{x:p.x,y:p.y,n:st.t.replace(/^Gebietsboss: /,'').slice(0,34),sym:'★'}:null; }
+let MAINT=0, GOALTXT='';
+function mainTick(dt){ if(!S||!S.cnt) return; const m=mEnsure();
+  /* Monster je Gebiet zaehlen */
+  if(m.lk==null) m.lk=S.cnt.kills||0; if((S.cnt.kills||0)>m.lk){ const d=S.cnt.kills-m.lk; m.lk=S.cnt.kills; if(map.name==='world'){ const a=(typeof areaAt==='function'&&areaAt(Math.floor(P.x/T),Math.floor(P.y/T)))||null; let id=a&&a.id; if(!id){ for(const b of OLDB){ if(Math.hypot(P.x/T-b.at[0],P.y/T-b.at[1])<30) id=b.id; } } if(id) m.ak[id]=(m.ak[id]||0)+d; } }
+  MAINT-=dt; if(MAINT>0) return; MAINT=0.5;
+  const st=MAIN[m.i]; if(st&&mode==='play'&&partDone(st,m)){ m.i++; m.talked=0; mStart(); const nx=MAIN[m.i]; SFX.power(); save();
+    if(nx){ if(nx.ch!==st.ch){ cutInText(CHN[nx.ch],'#ffd84a'); } else banner('Geschafft!','#7fff9a'); setTimeout(()=>{ if(st.done) say([['sys',st.done],['sys','Nächstes Ziel: '+nx.t]]); else showToast('Nächstes Ziel: '+nx.t,3); },900); } }
+  const g=storyGoal(); if(g&&g!==GOALTXT){ GOALTXT=g; updateGoal(); } }
+/* Gespraeche fuer die Geschichte */
+for(const d of NPC_DEFS){ if(!['borin','hagen','q_sandhafen'].includes(d.id)) continue; const t0=d.talk; d.talk=function(){ const lines=t0.call(this)||[]; if(S&&S.main){ const st=MAIN[S.main.i]; if(st&&st.type==='talk'&&st.id===d.id){ S.main.talked=1; } } return lines; }; }
+(function(){ const a0=arrowTarget; arrowTarget=function(){ return TUT.target||mainTarget()||a0(); }; })();
+/* Aufgaben-Reiter: Hauptgeschichte oben */
+(function(){ const r0=renderQuests; renderQuests=function(b){ if(S){ const m=mEnsure(); const st=MAIN[m.i]; H3(b,'Hauptgeschichte · '+(st?CHN[st.ch]:'abgeschlossen')); const c=document.createElement('div'); c.className='cardx'; c.style.borderColor='var(--gold)'; c.innerHTML=st?'<b>★ '+st.t+'</b>'+progTxt(st,m).replace(/^ /,'')+'<div class="abar"><i style="width:'+Math.round(100*m.i/MAIN.length)+'%"></i></div><small>Schritt '+(m.i+1)+' von '+MAIN.length+'</small>':'<b>✔ Elmaria ist frei!</b>'; b.appendChild(c); } r0(b); }; })();
+/* Nebelturm erst nach allen Bossen */
+function towerLocked(){ return !(typeof finaleReady==='function'&&finaleReady()&&S.main&&S.main.i>=MAIN.length-1); }
+/* ---------- Bosse herausfordernder ---------- */
+(function(){ const b0=bossAttackTick; bossAttackTick=function(e,dt){ const d=EDEF[e.type];
+  if(!e._dif){ e._dif=1; const L=(e.areaDef&&e.areaDef.L)||(typeof DNG!=='undefined'&&DNG&&map.name==='dng'?DNG.L:(S.hl||1)); const under=Math.max(0,L-(S.hl||1)); const mul=1.6+Math.min(1.2,under*0.1);
+    e.hp=Math.round(e.hp*mul); e.maxHp=e.hp; e.pdmg=1+Math.floor(L/12)+(under>=5?1:0); e.L=L;
+    if(under>=3) setTimeout(()=>showToast('Achtung: Dieser Boss ist sehr stark! Empfohlen Lv '+L+' – du bist Lv '+(S.hl||1),3),1200); }
+  b0(e,dt); minionTick(e,dt); }; })();
+function bProj(e,a,spd,el,d){ projs.push({x:e.x+Math.cos(a)*10,y:e.y+Math.sin(a)*10,vx:Math.cos(a)*spd,vy:Math.sin(a)*spd,owner:'g',d:d||220,el,z:e.z,dmg:e.pdmg||1}); }
+function minionTick(e,dt){ const sp=KIT[e.type]; if(!sp) return; e.mt=(e.mt==null?6:e.mt)-dt; if(e.mt>0) return; const ph=e.ph||1; e.mt=Math.max(6,15-ph*3);
+  const alive=enemies.filter(q=>q.minion===e&&!q.dead).length; if(alive>=1+ph) return;
+  const mk=e.type+'_m'; if(!KIT[mk]){ KIT[mk]=Object.assign({},sp,{boss:false,size:Math.max(0.5,(sp.size||1)*0.38),stage:Math.max(0,(sp.stage||0)-2),name:'Kleiner '+(sp.name||'Helfer')}); const d0=EDEF[e.type]; EDEF[mk]={hp:Math.max(4,Math.round((e.hp0||e.hp)*0.05)),spd:30,r:7,dmg:Math.max(1,Math.floor((e.L||1)/15)),shards:1,weak:Object.assign({},d0.weak||{}),imm:[],shoot:ph>=2?d0.shoot:null,fly:d0.fly,name:KIT[mk].name}; }
+  const n=ph>=3?2:1; for(let i=0;i<n;i++){ const a=Math.random()*6.28, x=e.x+Math.cos(a)*30, y=e.y+Math.sin(a)*30; enemies.push({type:mk,hx:x,hy:y,x,y,z:e.z,zv:e.zv,hp:EDEF[mk].hp,maxHp:EDEF[mk].hp,hw:6,hh:5,air:0,dead:false,deadT:0,dir:{x:0,y:0},dt:0,hurt:0,kb:0,kvx:0,kvy:0,seed:Math.floor(Math.random()*99),once:1,minion:e}); addParts(x,SY(y,e.zv)-6,'#ffffff',10,40,0.5); }
+  floatTxt(e.x,SY(e.y,e.zv)-44,(sp.name||'Der Boss')+' ruft Helfer!','#ffb060'); }
+(function(){ const m0=moreTick; moreTick=function(dt){ m0(dt); mainTick(dt); }; })();
+window.__main={get:()=>S.main,set:(i)=>{ S.main={i,base:null,ak:{}}; mStart(); },goal:()=>storyGoal()};
+
+/* ==== 28_uboss.js ==== */
+/* ===== Paket 24: Unterbosse – Anfuehrer, die auf der Weltkarte auftauchen (in jedem Gebiet), mit Phasen und Helfern ===== */
+const UB=[]; let UBOK=false;
+const OLDZ=[ /* Gebiete der alten Grundwelt: Mitte, Familie, Level */
+  {id:'glut',n:'Glutsteppe',c:[112,80],fam:'vulkan',L:4},{id:'nordwest',n:'Flüsterwald',c:[24,20],fam:'wald',L:5},{id:'nordost',n:'Felshöhen',c:[108,22],fam:'berg',L:7},
+  {id:'klippen',n:'Windklippen',c:[16,62],fam:'gras',L:8},{id:'wiese',n:'Lindenauer Wiesen',c:[80,96],fam:'gras',L:3},{id:'moor',n:'Mondsumpf',c:[40,112],fam:'sumpf',L:6},{id:'frostl',n:'Frostland',c:[146,78],fam:'tundra',L:10}];
+function ubInit(){ UBOK=true; const m=maps.world; if(!m) return; const walk=(x,y)=>{ if(x<1||y<1||x>=m.w-1||y>=m.h-1) return false; const t=m.t[y*m.w+x]; return !SOLID[t]&&!HAZ[t]; };
+  const pick=(cx,cy,rad,seed,n)=>{ const r=mulberry32(seed); const out=[]; for(let k=0;k<400&&out.length<n;k++){ const x=Math.round(cx+(r()-0.5)*rad*2), y=Math.round(cy+(r()-0.5)*rad*2); if(!walk(x,y)||Math.hypot(x-62,y-79)<16) continue; if(out.some(o=>Math.hypot(o[0]-x,o[1]-y)<10)) continue; out.push([x,y]); } return out; };
+  for(const z of OLDZ){ pick(z.c[0],z.c[1],12,hstr(z.id),z.id==='wiese'?1:2).forEach((p,i)=>UB.push({id:z.id+i,area:z.n,fam:z.fam,L:z.L+i,x:p[0],y:p[1],seed:hstr(z.id)+i*77})); }
+  if(typeof AR2!=='undefined') for(const a of AR2){ const cx=(a.r[0]+a.r[2])/2, cy=(a.r[1]+a.r[3])/2; pick(cx,cy,Math.min(a.r[2]-a.r[0],a.r[3]-a.r[1])/2-4,hstr(a.id)+5,3).forEach((p,i)=>{ if(a.arena&&Math.hypot(p[0]-a.arena[0],p[1]-a.arena[1])<12) return; UB.push({id:a.id+i,area:a.n,fam:a.fam,L:a.L-4+i*2,x:p[0],y:p[1],seed:hstr(a.id)+i*131}); }); } }
+const UBTITLE=['Anführer','Rudelboss','Wächter','Häuptling','Alphatier'];
+function ubSpec(u){ const key='U_'+u.id; if(!KIT[key]){ const fam=FAM.find(f=>f.id===u.fam)||FAM[0]; const sp=makeSpec(fam,u.seed,u.L,false); sp.boss=true; sp.size=1.35; sp.stage=Math.min(7,famStage(u.L)+1); sp.glow=true; sp.name=UBTITLE[u.seed%5]+' '+sp.name; KIT[key]=sp;
+    EDEF[key]={hp:Math.round(30*(1+0.22*(u.L-1))),spd:26,r:10,dmg:1+Math.floor(u.L/10),shards:5,weak:{[FAMWEAK[u.fam]||'feuer']:1.5},imm:[],shoot:{vulkan:'feuer',ozean:'wasser',wald:'dorn',dschungel:'dorn',tundra:'wasser',wueste:'feuer',sumpf:'nebel',berg:'wind',hoehle:'erde',oedland:'nebel',kristall:'licht',gras:'dorn'}[u.fam]||'nebel',fly:sp.body==='floater',name:sp.name}; } return key; }
+function ubTick(dt){ if(!S||!maps.world||map.name!=='world'||mode!=='play') return; if(!UBOK) ubInit(); S.ubd=S.ubd||{}; const now=Date.now();
+  for(const u of UB){ const act=enemies.find(e=>e.ubId===u.id); const dist=Math.hypot(P.x/T-u.x,P.y/T-u.y);
+    if(act){ if(act.dead){ if(!act._ubdone){ act._ubdone=1; S.ubd[u.id]=now; S.cnt.uboss=(S.cnt.uboss||0)+1; const lv=Math.max(u.L,S.hl||1); dropLoot(act.x,act.y+16,act.z,{it:genItem(lv,0.5,{q:Math.random()<0.35?3:2})}); dropLoot(act.x+10,act.y+20,act.z,{gold:40+u.L*10}); S.gems=(S.gems||0)+5+Math.floor(u.L/3); banner('Unterboss besiegt!','#ffd84a'); SFX.power(); save(); } continue; }
+      if(dist>40){ enemies=enemies.filter(q=>q!==act&&q.minion!==act); continue; } bossAttackTick(act,dt); continue; }
+    if(S.ubd[u.id]&&now-S.ubd[u.id]<15*60*1000) continue; if(dist>26) continue;
+    const key=ubSpec(u); const d=EDEF[key]; const x=u.x*T+8, y=u.y*T+8; const z=zAt(map,u.x,u.y)||0;
+    enemies.push({type:key,hx:x,hy:y,x,y,z,zv:z,hp:d.hp,maxHp:d.hp,hw:7,hh:5,air:0,dead:false,deadT:0,dir:{x:0,y:0},dt:0,hurt:0,kb:0,kvx:0,kvy:0,seed:3,once:1,ub:true,ubId:u.id,areaDef:{L:u.L}}); }
+  /* Ankuendigung, wenn man naeher kommt */
+  for(const e of enemies){ if(!e.ub||e.dead||e._ann) continue; if(Math.hypot(e.x-P.x,e.y-P.y)<T*9){ e._ann=1; banner(EDEF[e.type].name,'#ff9a3a'); showToast('Unterboss in der Nähe! (Lv '+((e.areaDef&&e.areaDef.L)||'?')+')',1.8); } } }
+/* Minikarte: Unterbosse als orange Rauten */
+(function(){ const x0=miniExtra; miniExtra=function(g,px,py,R){ x0(g,px,py,R); if(!S||!UBOK) return; const k=48/R; const now=Date.now(); for(const u of UB){ if(S.ubd&&S.ubd[u.id]&&now-S.ubd[u.id]<15*60*1000) continue; const dx=(u.x-px)*k, dy=(u.y-py)*k; if(dx*dx+dy*dy>2300) continue; g.save(); g.translate(48+dx,48+dy); g.rotate(Math.PI/4); g.fillStyle='#ff9a3a'; g.fillRect(-2.5,-2.5,5,5); g.restore(); } }; })();
+/* Geschichte: Unterbosse als Zwischenschritte */
+MAIN.splice(4,0,{ch:1,t:'Besiege einen Unterboss (orange Raute auf der Minikarte)',type:'cnt',k:'uboss',n:1});
+{ const i=MAIN.findIndex(s=>s.type==='aboss'&&s.id==='frost'); if(i>0) MAIN.splice(i,0,{ch:4,t:'Besiege 3 Unterbosse',type:'cnt',k:'uboss',n:3}); }
+{ const i=MAIN.findIndex(s=>s.type==='aboss'&&s.id==='asche'); if(i>0) MAIN.splice(i,0,{ch:6,t:'Besiege 3 weitere Unterbosse',type:'cnt',k:'uboss',n:3}); }
+ACH.push(['b4','Anführer-Jäger','Besiege 10 Unterbosse','uboss',10,40]);
+(function(){ const m0=moreTick; moreTick=function(dt){ m0(dt); ubTick(dt); }; })();
+window.__ub={list:()=>UB.slice(0,5).map(u=>[u.id,u.x,u.y,u.L]),n:()=>UB.length};
 
 function boot(data){
   resize(); toTitle();
